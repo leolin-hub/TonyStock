@@ -310,11 +310,11 @@ def store_predictions(
     raw_probs = model.predict(df[FEATURE_COLS].to_numpy())
     cal_probs = calibrator.predict(raw_probs)
     pred_df = (
-        df.with_columns([
+        df.select([
+            pl.col("symbol").str.replace(r"\.TW$", ""),
+            pl.col("week_start"),
             pl.Series("win_prob", cal_probs).round(4),
-            pl.col("symbol").str.replace(r"\.TW$", "").alias("symbol"),
         ])
-        .select(["symbol", "week_start", "win_prob"])
     )
     con.execute("""
         INSERT OR REPLACE INTO ml_predictions

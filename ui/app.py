@@ -27,7 +27,7 @@ with st.sidebar:
 
     min_win_prob = st.slider(
         "模型預測門檻（下週漲 20% 機率 ≥）",
-        min_value=0, max_value=100, value=50, step=5,
+        min_value=0, max_value=100, value=3, step=1,
         format="%d%%",
     )
 
