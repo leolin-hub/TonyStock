@@ -1,0 +1,40 @@
+# Virtual environment
+stock-env/
+venv/
+env/
+
+# Data files (DuckDB, parquet, model files)
+data/
+*.db
+*.parquet
+*.duckdb
+
+# ML model artifacts
+*.txt.model
+lgbm_model.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+
+# Claude local config
+.claude/
+CLAUDE.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

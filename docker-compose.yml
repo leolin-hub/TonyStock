@@ -1,0 +1,43 @@
+services:
+
+  scheduler:
+    build: .
+    # 1) run pipeline immediately on startup, 2) then enter weekly cron loop
+    command: >
+      sh -c "python -m scheduler.jobs --init &&
+             python -m scheduler.jobs"
+    volumes:
+      - db-data:/app/data
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "python", "-c", "import duckdb; duckdb.connect('/app/data/stocks.db', read_only=True).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s   # give --now enough time to finish
+
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/app/data
+    depends_on:
+      scheduler:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ui:
+    build: .
+    command: streamlit run ui/app.py --server.address 0.0.0.0 --server.port 8501
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  db-data:
