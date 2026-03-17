@@ -15,14 +15,17 @@ Time-series split:
   test  : week_start >= 2025-01-01  (held out)
 """
 
+import joblib
 import duckdb
 import lightgbm as lgb
 import polars as pl
 from pathlib import Path
+from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import roc_auc_score
 
-DB_PATH    = Path(__file__).parent.parent / "data" / "stocks.db"
-MODEL_PATH = Path(__file__).parent.parent / "data" / "lgbm_model.txt"
+DB_PATH         = Path(__file__).parent.parent / "data" / "stocks.db"
+MODEL_PATH      = Path(__file__).parent.parent / "data" / "lgbm_model.txt"
+CALIBRATOR_PATH = Path(__file__).parent.parent / "data" / "calibrator.joblib"
 
 TRAIN_END        = "2024-01-01"
 VAL_END          = "2025-01-01"
@@ -260,7 +263,29 @@ def train(df: pl.DataFrame) -> lgb.Booster:
         bar = "#" * int(score / max_gain * 25)
         print(f"  {feat:<30} {bar}")
 
-    return model
+    # ── Calibration (Isotonic Regression on val set) ───────────────────────────
+    calibrator = IsotonicRegression(out_of_bounds="clip")
+    calibrator.fit(val_pred, y_vl)
+
+    # Show before/after calibration on val set by decile
+    import numpy as np
+    cal_pred = calibrator.predict(val_pred)
+    print("\n[INFO] Calibration check (val set, by raw prob decile):")
+    print(f"  {'raw prob bucket':<18} {'n':>7} {'actual%':>9} {'before':>9} {'after':>9}")
+    for i in range(10):
+        lo, hi = i / 10, (i + 1) / 10
+        mask = (val_pred >= lo) & (val_pred < hi)
+        if mask.sum() == 0:
+            continue
+        actual  = y_vl[mask].mean()
+        before  = val_pred[mask].mean()
+        after   = cal_pred[mask].mean()
+        print(f"  {lo:.0%}–{hi:.0%}              {mask.sum():>7,} {actual:>8.2%} {before:>8.2%} {after:>8.2%}")
+
+    joblib.dump(calibrator, str(CALIBRATOR_PATH))
+    print(f"[INFO] Calibrator saved → {CALIBRATOR_PATH}")
+
+    return model, calibrator
 
 
 # ── Store predictions ─────────────────────────────────────────────────────────
@@ -276,10 +301,17 @@ def init_db(con: duckdb.DuckDBPyConnection) -> None:
     """)
 
 
-def store_predictions(con: duckdb.DuckDBPyConnection, df: pl.DataFrame, model: lgb.Booster) -> None:
+def store_predictions(
+    con: duckdb.DuckDBPyConnection,
+    df: pl.DataFrame,
+    model: lgb.Booster,
+    calibrator: IsotonicRegression,
+) -> None:
+    raw_probs = model.predict(df[FEATURE_COLS].to_numpy())
+    cal_probs = calibrator.predict(raw_probs)
     pred_df = (
         df.with_columns([
-            pl.Series("win_prob", model.predict(df[FEATURE_COLS].to_numpy())).round(4),
+            pl.Series("win_prob", cal_probs).round(4),
             pl.col("symbol").str.replace(r"\.TW$", "").alias("symbol"),
         ])
         .select(["symbol", "week_start", "win_prob"])
@@ -289,7 +321,7 @@ def store_predictions(con: duckdb.DuckDBPyConnection, df: pl.DataFrame, model: l
         SELECT symbol, week_start, win_prob FROM pred_df
     """)
     total = con.execute("SELECT COUNT(*) FROM ml_predictions").fetchone()[0]
-    print(f"[INFO] ml_predictions: {total:,} rows stored")
+    print(f"[INFO] ml_predictions: {total:,} rows stored (calibrated)")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -304,14 +336,14 @@ def run() -> None:
           f"win rate: {df['is_win'].mean():.1%}")
 
     print("\n[INFO] Training ...")
-    model = train(df)
+    model, calibrator = train(df)
 
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     model.save_model(str(MODEL_PATH))
     print(f"[INFO] Model saved → {MODEL_PATH}")
 
     print("\n[INFO] Storing predictions ...")
-    store_predictions(con, df, model)
+    store_predictions(con, df, model, calibrator)
     con.close()
     print("[DONE]")
 
