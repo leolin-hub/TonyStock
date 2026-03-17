@@ -41,8 +41,8 @@ def init_db(con: duckdb.DuckDBPyConnection) -> None:
 def compute_win_rate(
     con: duckdb.DuckDBPyConnection,
     score_threshold: int = 4,
-    n_weeks: int = 4,
-    return_threshold: float = 0.05,
+    n_weeks: int = 1,
+    return_threshold: float = 0.20,
     min_signals: int = 3,
 ) -> int:
     """
@@ -137,8 +137,8 @@ def compute_win_rate(
 
 def run(
     score_threshold: int = 4,
-    n_weeks: int = 4,
-    return_threshold: float = 0.05,
+    n_weeks: int = 1,
+    return_threshold: float = 0.20,
     min_signals: int = 3,
 ) -> None:
     con = duckdb.connect(str(DB_PATH))

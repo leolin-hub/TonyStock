@@ -24,6 +24,7 @@ from scheduler.fetch_price import run as fetch_price
 from scheduler.fetch_institutional import run as fetch_institutional
 from scheduler.score_institutional import run as score_institutional
 from scheduler.calc_win_rate import run as calc_win_rate
+from scheduler.train_lgbm import run as train_lgbm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,7 @@ def run_pipeline(lookback_days: int = 14) -> None:
         ("fetch_institutional", lambda: fetch_institutional(lookback_days=lookback_days)),
         ("score_institutional", lambda: score_institutional()),
         ("calc_win_rate",       lambda: calc_win_rate()),
+        ("train_lgbm",          lambda: train_lgbm()),
     ]
 
     for name, fn in steps:

@@ -7,7 +7,7 @@ services:
       sh -c "python -m scheduler.jobs --init &&
              python -m scheduler.jobs"
     volumes:
-      - db-data:/app/data
+      - ./data:/app/data
     restart: on-failure
     healthcheck:
       test: ["CMD", "python", "-c", "import duckdb; duckdb.connect('/app/data/stocks.db', read_only=True).close()"]
@@ -22,7 +22,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - db-data:/app/data
+      - ./data:/app/data
     depends_on:
       scheduler:
         condition: service_healthy
@@ -39,5 +39,3 @@ services:
       - api
     restart: unless-stopped
 
-volumes:
-  db-data:

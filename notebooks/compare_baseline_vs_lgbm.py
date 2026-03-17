@@ -19,8 +19,8 @@ from pathlib import Path
 
 DB_PATH  = Path("data/stocks.db")
 TEST_START = "2025-01-01"
-RETURN_THRESHOLD = 0.05
-N_WEEKS_FORWARD  = 4
+RETURN_THRESHOLD = 0.20
+N_WEEKS_FORWARD  = 1
 
 
 def build_test_set(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
@@ -72,7 +72,7 @@ def build_test_set(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
         LEFT JOIN win_rate w
             ON l.symbol_short = w.symbol
             AND w.score_threshold  = 4
-            AND w.n_weeks          = 4
+            AND w.n_weeks          = 1
             AND w.return_threshold = {RETURN_THRESHOLD}
         LEFT JOIN ml_predictions m
             ON l.symbol_short = m.symbol
