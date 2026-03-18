@@ -13,6 +13,7 @@ CLI:
   python -m scheduler.jobs --now     # run pipeline once (incremental, 14d)
   python -m scheduler.jobs --init    # run pipeline once (historical, 1825d) then exit; skips if DB already populated
   python -m scheduler.jobs --reinit  # same as --init but forces re-fetch even if DB has data
+  python -m scheduler.jobs --retrain # retrain model only (no data fetch); use after feature changes
 """
 
 import logging
@@ -112,6 +113,10 @@ if __name__ == "__main__":
         else:
             log.info("Init mode: fetching 1825 days of historical data ...")
             run_pipeline(lookback_days=1825)
+    elif arg == "--retrain":
+        log.info("Retrain mode: running train_lgbm only ...")
+        train_lgbm()
+        log.info("Retrain complete.")
     elif arg == "--now":
         log.info("Manual trigger: running pipeline (incremental 14d) ...")
         run_pipeline(lookback_days=14)
