@@ -2,5 +2,6 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "sh -c 'python -m scheduler.jobs --init && uvicorn api.main:app --host 0.0.0.0 --port $PORT'"
+startCommand = "sh -c 'python -m scheduler.jobs --reinit && uvicorn api.main:app --host 0.0.0.0 --port $PORT'"
 restartPolicyType = "on_failure"
+healthcheckTimeout = 1800

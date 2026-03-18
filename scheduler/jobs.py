@@ -9,9 +9,10 @@ Pipeline order:
   4. calc_win_rate        — recompute win rates (full recompute)
 
 CLI:
-  python -m scheduler.jobs          # start weekly cron
-  python -m scheduler.jobs --now    # run pipeline once (incremental, 14d)
-  python -m scheduler.jobs --init   # run pipeline once (historical, 90d) then exit
+  python -m scheduler.jobs           # start weekly cron
+  python -m scheduler.jobs --now     # run pipeline once (incremental, 14d)
+  python -m scheduler.jobs --init    # run pipeline once (historical, 1825d) then exit; skips if DB already populated
+  python -m scheduler.jobs --reinit  # same as --init but forces re-fetch even if DB has data
 """
 
 import logging
@@ -83,12 +84,12 @@ def start() -> None:
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else ""
 
-    if arg == "--init":
+    if arg in ("--init", "--reinit"):
         import duckdb
         from pathlib import Path
         db_path = Path(__file__).parent.parent / "data" / "stocks.db"
         has_data = False
-        if db_path.exists():
+        if arg == "--init" and db_path.exists():
             try:
                 con = duckdb.connect(str(db_path))
                 count = con.execute(
@@ -109,8 +110,8 @@ if __name__ == "__main__":
         if has_data:
             log.info("Init mode: DB already has data — skipping full init.")
         else:
-            log.info("Init mode: fetching 365 days of historical data ...")
-            run_pipeline(lookback_days=365)
+            log.info("Init mode: fetching 1825 days of historical data ...")
+            run_pipeline(lookback_days=1825)
     elif arg == "--now":
         log.info("Manual trigger: running pipeline (incremental 14d) ...")
         run_pipeline(lookback_days=14)
