@@ -59,6 +59,28 @@ def log_norm(col: str) -> pl.Expr:
 
 
 def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
+    # -- diagnostics (remove after fix) --
+    sample_price = con.execute("""
+        SELECT symbol, date, DATE_TRUNC('week', date)::DATE as week_mon
+        FROM weekly_price WHERE symbol LIKE '%.TW' LIMIT 3
+    """).fetchall()
+    print(f"[DEBUG] weekly_price sample: {sample_price}")
+
+    sample_score = con.execute("""
+        SELECT symbol, week_start FROM weekly_score LIMIT 3
+    """).fetchall()
+    print(f"[DEBUG] weekly_score sample: {sample_score}")
+
+    join_count = con.execute("""
+        SELECT COUNT(*) FROM weekly_price p
+        JOIN weekly_score s
+          ON LEFT(p.symbol, LENGTH(p.symbol)-3) = s.symbol
+         AND DATE_TRUNC('week', p.date)::DATE = s.week_start
+        WHERE p.symbol LIKE '%.TW'
+    """).fetchone()[0]
+    print(f"[DEBUG] JOIN row count: {join_count}")
+    # -- end diagnostics --
+
     raw = con.execute("""
         SELECT
             p.symbol,
