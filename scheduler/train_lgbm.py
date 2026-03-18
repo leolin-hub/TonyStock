@@ -332,8 +332,15 @@ def run() -> None:
 
     print("[INFO] Building features ...")
     df = build_features(con)
+    win_rate = df['is_win'].mean()
+    win_rate_str = f"{win_rate:.1%}" if win_rate is not None else "N/A (empty dataset)"
     print(f"[INFO] Total: {len(df):,} rows | {df['symbol'].n_unique():,} symbols | "
-          f"win rate: {df['is_win'].mean():.1%}")
+          f"win rate: {win_rate_str}")
+
+    if len(df) == 0:
+        print("[WARN] Empty dataset after feature engineering — skipping training.")
+        con.close()
+        return
 
     print("\n[INFO] Training ...")
     model, calibrator = train(df)
