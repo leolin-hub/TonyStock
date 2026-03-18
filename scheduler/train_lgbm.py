@@ -61,10 +61,23 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
     # Fetch full price history for rolling features, then LEFT JOIN score/institutional.
     # Using INNER JOIN here would truncate history to ~1yr (weekly_score coverage),
     # causing rolling_max(52) / shift(12) to produce all-null columns → empty dataset.
+    # CTE pre-computes base_symbol once and filters to only symbols in weekly_score,
+    # avoiding repeated string ops in JOIN conditions across 267K rows.
     raw = con.execute("""
+        WITH price_base AS (
+            SELECT
+                symbol,
+                REPLACE(symbol, '.TW', '') AS base_symbol,
+                DATE_TRUNC('week', date)::DATE AS week_start,
+                open, high, low, close, volume
+            FROM weekly_price
+            WHERE symbol LIKE '%.TW'
+              AND close > 0
+              AND REPLACE(symbol, '.TW', '') IN (SELECT DISTINCT symbol FROM weekly_score)
+        )
         SELECT
             p.symbol,
-            DATE_TRUNC('week', p.date)::DATE AS week_start,
+            p.week_start,
             p.open,
             p.high,
             p.low,
@@ -78,16 +91,14 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
             i.trust_net_sum,
             i.dealer_net_sum,
             i.total_net_sum
-        FROM weekly_price p
+        FROM price_base p
         LEFT JOIN weekly_score s
-            ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = s.symbol
-            AND DATE_TRUNC('week', p.date)::DATE = s.week_start
+            ON p.base_symbol = s.symbol
+            AND p.week_start = s.week_start
         LEFT JOIN weekly_institutional i
-            ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = i.symbol
-            AND DATE_TRUNC('week', p.date)::DATE = i.week_start
-        WHERE p.symbol LIKE '%.TW'
-          AND p.close > 0
-        ORDER BY p.symbol, p.date
+            ON p.base_symbol = i.symbol
+            AND p.week_start = i.week_start
+        ORDER BY p.symbol, p.week_start
     """).pl()
 
     # Step 1: log-normalize institutional volumes
