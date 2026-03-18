@@ -62,7 +62,7 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
     raw = con.execute("""
         SELECT
             p.symbol,
-            p.date          AS week_start,
+            DATE_TRUNC('week', p.date)::DATE AS week_start,
             p.open,
             p.high,
             p.low,
@@ -79,10 +79,10 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
         FROM weekly_price p
         INNER JOIN weekly_score s
             ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = s.symbol
-            AND p.date = s.week_start
+            AND DATE_TRUNC('week', p.date)::DATE = s.week_start
         INNER JOIN weekly_institutional i
             ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = i.symbol
-            AND p.date = i.week_start
+            AND DATE_TRUNC('week', p.date)::DATE = i.week_start
         WHERE p.symbol LIKE '%.TW'
           AND p.close > 0
         ORDER BY p.symbol, p.date
