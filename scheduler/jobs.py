@@ -20,7 +20,7 @@ import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from scheduler.fetch_price import run as fetch_price
+from scheduler.fetch_price import run as fetch_price, run_all_tw as fetch_price_all_tw
 from scheduler.fetch_institutional import run as fetch_institutional
 from scheduler.score_institutional import run as score_institutional
 from scheduler.calc_win_rate import run as calc_win_rate
@@ -39,7 +39,7 @@ def run_pipeline(lookback_days: int = 14) -> None:
     log.info("Pipeline started")
 
     steps = [
-        ("fetch_price",         lambda: fetch_price()),
+        ("fetch_price",         lambda: fetch_price_all_tw()),
         ("fetch_institutional", lambda: fetch_institutional(lookback_days=lookback_days)),
         ("score_institutional", lambda: score_institutional()),
         ("calc_win_rate",       lambda: calc_win_rate()),
