@@ -5,9 +5,8 @@ Trains a LightGBM binary classifier to predict next-week price movement.
 y: is_win = 1 if close[+1w] >= close * 1.20  (20% in 1 week)
 X: institutional raw volumes (log-normalized) + price momentum + technical indicators
 
-Technical indicators added (v3):
-  RSI(14), MACD histogram (normalized), Bollinger Band position,
-  ATR ratio (volatility), MA20 slope (trend direction)
+Technical indicators:
+  Bollinger Band position, ATR ratio (volatility), MA20 slope (trend direction)
 
 Time-series split:
   train : week_start < 2024-01-01
@@ -44,7 +43,7 @@ FEATURE_COLS = [
     # Price position
     "close_vs_52w_high",
     # Technical indicators
-    "rsi", "macd_norm", "bb_position", "atr_ratio", "ma20_slope",
+    "bb_position", "atr_ratio", "ma20_slope",
 ]
 
 
@@ -147,47 +146,28 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
 
         # --- Technical indicator intermediates ---
 
-        # RSI: price delta gain/loss
-        (pl.col("close") - pl.col("close").shift(1).over("symbol")).alias("_delta"),
-
         # True Range components for ATR
         (pl.col("high") - pl.col("low")).alias("_hl"),
         (pl.col("high") - pl.col("close").shift(1).over("symbol")).abs().alias("_hpc"),
         (pl.col("low")  - pl.col("close").shift(1).over("symbol")).abs().alias("_lpc"),
-
-        # MACD: rolling mean as EMA proxy
-        pl.col("close").rolling_mean(window_size=12).over("symbol").alias("_ema12"),
-        pl.col("close").rolling_mean(window_size=26).over("symbol").alias("_ema26"),
 
         # Bollinger Band
         pl.col("close").rolling_mean(window_size=20).over("symbol").alias("_ma20"),
         pl.col("close").rolling_std(window_size=20).over("symbol").alias("_std20"),
     ])
 
-    # Step 3: RSI gain/loss split + True Range
+    # Step 3: True Range
     df = df.with_columns([
-        pl.col("_delta").clip(lower_bound=0).alias("_gain"),
-        pl.col("_delta").clip(upper_bound=0).abs().alias("_loss"),
         pl.max_horizontal("_hl", "_hpc", "_lpc").alias("_tr"),
     ])
 
-    # Step 4: rolling averages for RSI + ATR
+    # Step 4: rolling averages for ATR
     df = df.with_columns([
-        pl.col("_gain").rolling_mean(window_size=14).over("symbol").alias("_avg_gain"),
-        pl.col("_loss").rolling_mean(window_size=14).over("symbol").alias("_avg_loss"),
         pl.col("_tr").rolling_mean(window_size=14).over("symbol").alias("_atr"),
     ])
 
     # Step 5: final technical indicators
     df = df.with_columns([
-        # RSI (0–1 scale; 0.7+ = overbought, 0.3- = oversold)
-        (pl.col("_avg_gain") /
-         (pl.col("_avg_gain") + pl.col("_avg_loss") + 1e-8)
-        ).alias("rsi"),
-
-        # MACD histogram normalized by close (dimensionless)
-        ((pl.col("_ema12") - pl.col("_ema26")) / pl.col("close")).alias("macd_norm"),
-
         # Bollinger Band position (-1 to 1; positive = above MA)
         ((pl.col("close") - pl.col("_ma20")) /
          (2 * pl.col("_std20") + 1e-8)
