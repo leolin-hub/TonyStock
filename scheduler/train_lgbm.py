@@ -81,6 +81,9 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
     print(f"[DEBUG] JOIN row count: {join_count}")
     # -- end diagnostics --
 
+    # Fetch full price history for rolling features, then LEFT JOIN score/institutional.
+    # Using INNER JOIN here would truncate history to ~1yr (weekly_score coverage),
+    # causing rolling_max(52) / shift(12) to produce all-null columns → empty dataset.
     raw = con.execute("""
         SELECT
             p.symbol,
@@ -99,10 +102,10 @@ def build_features(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
             i.dealer_net_sum,
             i.total_net_sum
         FROM weekly_price p
-        INNER JOIN weekly_score s
+        LEFT JOIN weekly_score s
             ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = s.symbol
             AND DATE_TRUNC('week', p.date)::DATE = s.week_start
-        INNER JOIN weekly_institutional i
+        LEFT JOIN weekly_institutional i
             ON LEFT(p.symbol, LENGTH(p.symbol) - 3) = i.symbol
             AND DATE_TRUNC('week', p.date)::DATE = i.week_start
         WHERE p.symbol LIKE '%.TW'
