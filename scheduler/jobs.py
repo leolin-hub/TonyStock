@@ -97,7 +97,12 @@ if __name__ == "__main__":
                 ).fetchone()[0]
                 if count:
                     rows = con.execute("SELECT COUNT(*) FROM weekly_institutional").fetchone()[0]
-                    has_data = rows > 0
+                    pred_count = con.execute(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                        "WHERE table_name = 'ml_predictions'"
+                    ).fetchone()[0]
+                    pred_rows = con.execute("SELECT COUNT(*) FROM ml_predictions").fetchone()[0] if pred_count else 0
+                    has_data = rows > 0 and pred_rows > 0
                 con.close()
             except Exception:
                 pass
