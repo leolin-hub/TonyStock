@@ -39,7 +39,6 @@ def get_con() -> duckdb.DuckDBPyConnection:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_con()
     yield
     if _con:
         _con.close()
